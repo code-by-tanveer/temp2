@@ -1,0 +1,21 @@
+version: "3.9"
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    volumes:
+      - ./src:/var/www/html/src
+      - ./config:/var/www/html/config
+      - ./public:/var/www/html/public
+      - ./logs:/var/www/html/logs
+      - ./data:/var/www/html/data
+    depends_on:
+      - redis # Add dependency on redis service
+
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
