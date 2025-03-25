@@ -17,5 +17,9 @@ return [
         'host' => 'redis',
         'port' => 6379,
         // 'password' => 'redis_password'
+    ],
+    'app' => [ // Add or modify 'app' array
+        'message_edit_time_limit' => 300, // 5 minutes in seconds
     ]
+
 ];

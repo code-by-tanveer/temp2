@@ -43,22 +43,32 @@ class GroupRepository
     //     ];
     // }
 
-    public function getAllGroups(?string $paginationToken = null, string $paginationDirection = 'next'): array
+    public function getAllGroups(?string $paginationToken = null, string $paginationDirection = 'next', ?string $search = null): array // Added $search parameter
     {
-        $tokenId = $paginationToken ? base64_decode($paginationToken) : null; // Use a single variable for token ID
+        $tokenId = $paginationToken ? base64_decode($paginationToken) : null;
         $sql = "SELECT * FROM groups";
         $params = [];
-        $orderBy = "ASC"; // Default order
-        $comparisonOperator = ">"; // Default operator for 'next'
+        $orderBy = "ASC";
+        $comparisonOperator = ">";
 
         if ($paginationDirection === 'before') {
             $orderBy = "DESC";
             $comparisonOperator = "<";
         }
 
+        $whereClauses = []; // Array to hold WHERE clauses
+
         if ($tokenId) {
-            $sql .= " WHERE id " . $comparisonOperator . " :tokenId";
+            $whereClauses[] = "id " . $comparisonOperator . " :tokenId";
             $params[':tokenId'] = $tokenId;
+        }
+        if ($search) { // Add search condition if search term is provided
+            $whereClauses[] = "name LIKE :search";
+            $params[':search'] = '%' . $search . '%'; // Use LIKE for partial match, add wildcards
+        }
+
+        if (!empty($whereClauses)) {
+            $sql .= " WHERE " . implode(" AND ", $whereClauses); // Combine WHERE clauses with AND
         }
 
         $sql .= " ORDER BY id " . $orderBy . " LIMIT " . ($this->pageSize + 1);
@@ -68,7 +78,6 @@ class GroupRepository
 
         $groups = array_slice($groupsWithExtra, 0, $this->pageSize);
 
-        // Create next/prev tokens based on pagination direction
         $hasNext = false;
         $hasPrev = false;
         $nextToken = null;
@@ -80,10 +89,10 @@ class GroupRepository
             $hasPrev = $paginationToken !== null;
             $prevToken = $hasPrev && !empty($groups) ? base64_encode($groups[0]['id']) : null;
         } elseif ($paginationDirection === 'before') {
-            $hasNext = $paginationToken !== null; // hasNext (older) when beforeToken is present
-            $hasPrev = count($groupsWithExtra) > $this->pageSize; // hasPrev (newer) if extra items fetched
-            $nextToken = $hasNext && !empty($groups) ? base64_encode($groups[0]['id']) : null; // nextToken (older) from first item
-            $prevToken = $hasPrev && !empty($groups) ? base64_encode(end($groups)['id']) : null; // prevToken (newer) from last item
+            $hasNext = $paginationToken !== null;
+            $hasPrev = count($groupsWithExtra) > $this->pageSize;
+            $nextToken = $hasNext && !empty($groups) ? base64_encode($groups[0]['id']) : null;
+            $prevToken = $hasPrev && !empty($groups) ? base64_encode(end($groups)['id']) : null;
         }
 
         return [
@@ -96,6 +105,7 @@ class GroupRepository
             ]
         ];
     }
+
     
     public function create(string $name, int $adminUserId, string $groupImage): array
     {

@@ -13,11 +13,12 @@ class MessageController extends BaseController
     protected $groupRepository;
     protected $logger;
 
-    public function __construct(MessageRepository $messageRepository, GroupRepository $groupRepository, \Monolog\Logger $logger)
+    public function __construct(MessageRepository $messageRepository, GroupRepository $groupRepository, \Monolog\Logger $logger, int $editTimeLimit)
     {
         $this->messageRepository = $messageRepository;
         $this->groupRepository = $groupRepository;
         $this->logger = $logger;
+        $this->editTimeLimit = $editTimeLimit;
     }
 
     public function send(Request $request, Response $response, array $args): Response
@@ -56,6 +57,53 @@ class MessageController extends BaseController
         }
     }
 
+    public function edit(Request $request, Response $response, array $args): Response
+    {
+        $groupId = (int)$args['group_id'];
+        $messageId = (int)$args['message_id'];
+        $params = $this->getRequestData($request);
+        $content = trim($params['content'] ?? '');
+
+        // Enforce max message length (1000 characters)
+        if (strlen($content) > 1000) {
+            return $this->errorResponse($response, 'Message exceeds maximum length', 400);
+        }
+
+        if (empty($content)) {
+            return $this->errorResponse($response, 'Content is required', 400);
+        }
+
+        $user = $request->getAttribute('user');
+
+        try {
+            $message = $this->messageRepository->findById($messageId);
+            if (!$message) {
+                return $this->errorResponse($response, 'Message not found', 404);
+            }
+
+            if ($message['user_id'] !== $user->sub) {
+                return $this->errorResponse($response, 'Unauthorized to edit this message', 403);
+            }
+
+            $createdAtTimestamp = strtotime($message['created_at']);
+            $currentTime = time();
+            if (($currentTime - $createdAtTimestamp) > $this->editTimeLimit) {
+                return $this->errorResponse($response, 'Message edit time limit exceeded', 400, ['time_limit_seconds' => $this->editTimeLimit]);
+            }
+
+            $updatedMessage = $this->messageRepository->update($messageId, $user->sub, $content);
+            if (!$updatedMessage) { // Check if update was successful (though unlikely to fail if message exists and user is authorized)
+                return $this->errorResponse($response, 'Message update failed', 500); // More generic error in case update fails unexpectedly
+            }
+
+            return $this->successResponse($response, $updatedMessage, 'Message updated successfully');
+
+        } catch (\Exception $e) {
+            $this->logger->error('Edit message failed', ['exception' => $e]);
+            return $this->errorResponse($response, 'Edit message failed', 500);
+        }
+    }
+
     public function list(Request $request, Response $response, array $args): Response
     {
         $groupId = (int)$args['group_id'];
@@ -70,4 +118,25 @@ class MessageController extends BaseController
             return $this->errorResponse($response, 'List messages failed', 500);
         }
     }
+
+    public function search(Request $request, Response $response, array $args): Response
+    {
+        $groupId = (int)$args['group_id'];
+        $queryParams = $request->getQueryParams();
+        $searchQuery = trim($queryParams['query'] ?? ''); // Get 'query' parameter for search term
+        $paginationToken = $queryParams['token'] ?? null;
+
+        if (empty($searchQuery)) {
+            return $this->errorResponse($response, 'Search query is required', 400);
+        }
+
+        try {
+            $result = $this->messageRepository->searchByGroup($groupId, $searchQuery, $paginationToken);
+            return $this->successResponse($response, $result);
+        } catch (\Exception $e) {
+            $this->logger->error('Search messages failed', ['exception' => $e]);
+            return $this->errorResponse($response, 'Search messages failed', 500);
+        }
+    }
+
 }

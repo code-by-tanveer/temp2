@@ -26,6 +26,17 @@ class MessageRepository
         $id = $this->db->lastInsertId();
         return $this->findById($id);
     }
+
+    public function update(int $id, int $userId, string $content): ?array
+    {
+        $stmt = $this->db->prepare("UPDATE messages SET content = :content WHERE id = :id AND user_id = :user_id");
+        $stmt->execute([
+            ':id' => $id,
+            ':user_id' => $userId,
+            ':content' => $content,
+        ]);
+        return $this->findById($id); // Return the updated message
+    }
     
     public function findById(int $id): ?array
     {
@@ -65,4 +76,41 @@ class MessageRepository
             ]
         ];
     }
+
+    public function searchByGroup(int $groupId, string $searchQuery, ?string $paginationToken = null): array
+    {
+        $lastId = $paginationToken ? (int) base64_decode($paginationToken) : 0;
+        $sql = "SELECT * FROM messages WHERE group_id = :group_id AND content LIKE :search_query";
+        $params = [
+            ':group_id' => $groupId,
+            ':search_query' => '%' . $searchQuery . '%' // LIKE with wildcards for search
+        ];
+
+        if ($lastId) {
+            $sql .= " AND id > :lastId";
+            $params[':lastId'] = $lastId;
+        }
+
+        $sql .= " ORDER BY id ASC LIMIT " . $this->pageSize;
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $messages = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Create next/prev tokens (simple example - same as listByGroup)
+        $hasNext = count($messages) === $this->pageSize;
+        $hasPrev = $lastId > 0;
+        $nextToken = $hasNext ? base64_encode(end($messages)['id']) : null;
+        $prevToken = $hasPrev ? base64_encode($messages[0]['id']) : null;
+
+        return [
+            'messages' => $messages,
+            'pagination' => [
+                'hasNext' => $hasNext,
+                'hasPrev' => $hasPrev,
+                'nextToken' => $nextToken,
+                'prevToken' => $prevToken
+            ]
+        ];
+    }
+
 }

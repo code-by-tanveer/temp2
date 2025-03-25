@@ -25,9 +25,10 @@ class GroupController extends BaseController
         $queryParams = $request->getQueryParams();
         $paginationCursor = $queryParams['cursor'] ?? null;
         $paginationRel = $queryParams['rel'] ?? null;
+        $search = $queryParams['search'] ?? null; // Get the 'search' query parameter
 
         try {
-            $result = $this->groupRepository->getAllGroups($paginationCursor, $paginationRel);
+            $result = $this->groupRepository->getAllGroups($paginationCursor, $paginationRel, $search); // Pass the search term
             return $this->successResponse($response, $result);
         } catch (\Exception $e) {
             $this->logger->error('Error in fetching groups', ['exception' => $e]);

@@ -49,6 +49,15 @@ return [
             $container->get('jwt_config')
         );
     },
+    MessageController::class => function ($container) { // Update MessageController definition
+        return new MessageController(
+            $container->get(MessageRepository::class),
+            $container->get(GroupRepository::class),
+            $container->get(Logger::class),
+            $container->get('message_edit_time_limit') // Inject message_edit_time_limit
+        );
+    },
+
     'jwt_config' => function() {
         $config = require __DIR__ . '/config.php';
         return $config['jwt'];
@@ -59,5 +68,9 @@ return [
     },
     'app_name' => function() {
         return 'chit-chat';
-    }
+    },
+    'message_edit_time_limit' => function() { // Add this
+        $config = require __DIR__ . '/config.php';
+        return $config['app']['message_edit_time_limit'];
+    },
 ];

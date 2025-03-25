@@ -32,19 +32,21 @@ $app->group('', function($group) {
     // Message routes
     $group->post('/groups/{group_id}/messages', \App\Controllers\MessageController::class . ':send');
     $group->get('/groups/{group_id}/messages', \App\Controllers\MessageController::class . ':list');
+    $group->put('/groups/{group_id}/messages/{message_id}', \App\Controllers\MessageController::class . ':edit');
+    $group->get('/groups/{group_id}/messages/search', \App\Controllers\MessageController::class . ':search');
 
     // Preset images route
     $group->get('/preset-images', \App\Controllers\PresetImageController::class . ':list');
 });
 
 $app->map(['GET', 'POST', 'PUT', 'DELETE', 'PATCH'], '/{routes:.+}', function ($request, $response) {
-    $response = new \Slim\Psr7\Response();
+    $slimRespone = new \Slim\Psr7\Response();
     $payload = [
         'success' => false,
         'message' => 'Route not found',
     ];
-    $response->getBody()->write(json_encode($payload));
-    return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+    $slimRespone->getBody()->write(json_encode($payload));
+    return $slimRespone->withHeader('Content-Type', 'application/json')->withStatus(400);
 });
 
 $app->run();
